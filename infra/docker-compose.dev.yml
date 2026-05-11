@@ -1,0 +1,16 @@
+# Development override — exposes DB ports to localhost
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up mongo redis -d
+services:
+  mongo:
+    ports:
+      - '27017:27017'
+    networks:
+      - internal
+      - public
+
+  redis:
+    ports:
+      - '6379:6379'
+    networks:
+      - internal
+      - public

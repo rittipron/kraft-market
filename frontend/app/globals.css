@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Accent */
+  --coral: #D97755;
+  --coral-soft: #F5E6DF;
+  --coral-deep: #B85C38;
+
+  /* Secondary */
+  --teal: #2A9D8F;
+  --teal-soft: #D4EFED;
+
+  /* Warning */
+  --amber: #E9C46A;
+  --amber-soft: #FDF6DC;
+
+  /* Text */
+  --ink: #1A1A2E;
+  --ink-2: #3D3D5C;
+  --ink-3: #6B6B8A;
+  --ink-4: #9999B3;
+
+  /* Backgrounds */
+  --bg: #FAF8F5;
+  --bg-2: #F2EFE9;
+  --bg-3: #E8E4DC;
+  --surface: #FFFFFF;
+
+  /* Borders */
+  --line: #E2DDD6;
+  --line-2: #CBC5BC;
+
+  /* Status */
+  --good: #2D9E6B;
+  --good-soft: #D4F0E4;
+  --bad: #E05252;
+  --warn: #E07B00;
+
+  /* Fonts */
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+body {
+  font-family: var(--font-body), 'Plus Jakarta Sans', system-ui, sans-serif;
+  background-color: var(--bg);
+  color: var(--ink);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display), 'Bricolage Grotesque', system-ui, sans-serif;
+}
+
+code, pre {
+  font-family: var(--font-mono), 'JetBrains Mono', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-2); }
+::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-4); }

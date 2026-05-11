@@ -1,0 +1,647 @@
+---------------------
+Part 1
+---------------------
+
+You are a senior Next.js developer building the frontend for Kraft Market — a Thai e-commerce + CMS + POS platform.
+
+Tech stack:
+- Next.js 14 with App Router (TypeScript)
+- Tailwind CSS v3
+- SWR for client-side data fetching
+- Zustand for global state (cart, auth)
+- NestJS backend at http://localhost:3001
+
+Project structure to scaffold:
+```
+frontend/
+├── app/
+│   ├── (store)/           # Customer storefront
+│   │   ├── page.tsx       # Homepage with hero, categories, flash sale, product grid
+│   │   ├── products/[id]/ # Product detail page
+│   │   └── cart/          # Cart & checkout
+│   ├── admin/             # Admin panel (protected)
+│   │   ├── layout.tsx     # Admin sidebar layout
+│   │   ├── page.tsx       # Dashboard
+│   │   ├── products/      # Product manager
+│   │   ├── orders/        # Order manager
+│   │   ├── builder/       # Page builder
+│   │   └── pos/           # POS terminal
+│   ├── api/               # Next.js API routes (proxy to NestJS)
+│   └── layout.tsx         # Root layout with fonts & providers
+├── components/
+│   ├── ui/                # Icon, Badge, Button, Card primitives
+│   ├── store/             # StoreHeader, ProductCard, Cart
+│   └── admin/             # AdminSidebar, Dashboard, POS
+└── lib/
+    ├── api.ts             # Fetch helpers (getProducts, getOrders, etc.)
+    └── store.ts           # Zustand stores (cartStore, authStore)
+```
+
+Design system (from prototype):
+- Fonts: Bricolage Grotesque (display), Plus Jakarta Sans (body), JetBrains Mono (mono)
+- Colors: warm off-white bg, deep ink text, coral (#D97755) accent, teal secondary
+- CSS variables: --coral, --coral-soft, --coral-deep, --teal, --ink, --bg, --font-display
+
+Key behaviors to implement:
+1. Storefront: hero banner, 8-category grid, flash sale countdown, product grid with filters
+2. Product detail: gallery, quantity selector, add-to-cart, shop info
+3. Cart: sidebar drawer, quantity update, coupon code, order summary
+4. Admin: sidebar navigation with route groups (CONTENT / COMMERCE / INSIGHTS / SETTINGS)
+5. POS: full-screen terminal with product grid, cart panel, payment modal (Cash/PromptPay/Card)
+6. Page Builder: block-based editor (Hero, Heading, Text, Image, Products, CTA, Columns, Testimonials)
+
+Middleware requirements:
+- Protect all /admin/* routes (redirect to /login if no JWT)
+- Role check: 'admin' role required for write operations
+
+Start by: creating the root layout.tsx with fonts and providers, then scaffold the App Router file structure.
+Read AGENTS.md, SKILL.md, and HISTORY.md before starting.
+
+---------------------
+Part 2
+---------------------
+
+You are a senior NestJS developer building the REST + WebSocket API for Kraft Market.
+
+Tech stack:
+- NestJS 10 (TypeScript)
+- Mongoose (MongoDB ODM)
+- ioredis (Redis client)
+- Passport.js + JWT (@nestjs/passport @nestjs/jwt)
+- @nestjs/websockets with Socket.IO
+- class-validator + class-transformer for DTOs
+- @nestjs/config for env management
+
+Modules to scaffold:
+```
+backend/src/
+├── app.module.ts          # Root module
+├── main.ts                # Bootstrap (Helmet, ValidationPipe, CORS, prefix '/api')
+├── auth/
+│   ├── auth.module.ts
+│   ├── auth.controller.ts # POST /api/auth/login, /register, /refresh
+│   ├── auth.service.ts    # JWT sign/verify, bcrypt hash
+│   ├── jwt.strategy.ts    # Passport JWT strategy
+│   ├── jwt-auth.guard.ts  # Auth guard
+│   └── roles.guard.ts     # Role-based guard (@Roles('admin'))
+├── products/
+│   ├── product.schema.ts  # Mongoose schema
+│   ├── product.dto.ts     # CreateProductDto, UpdateProductDto, ProductQueryDto
+│   ├── products.service.ts # CRUD + Redis cache (TTL 5min)
+│   └── products.controller.ts
+├── orders/
+│   ├── order.schema.ts
+│   ├── orders.service.ts  # Create order, update status, get analytics
+│   └── orders.controller.ts
+├── pos/
+│   ├── pos.gateway.ts     # WebSocket: cart:add, cart:remove, payment:confirm
+│   ├── pos.service.ts     # Redis cart operations (HSET/HGET/HDEL)
+│   └── pos.controller.ts  # POST /api/pos/checkout
+├── pages/                 # CMS page management
+│   ├── page.schema.ts     # { title, slug, status, blocks[] }
+│   ├── pages.service.ts
+│   └── pages.controller.ts
+└── common/
+    ├── redis.module.ts    # Global Redis provider (ioredis)
+    ├── cache.interceptor.ts # Cache-aside interceptor
+    └── throttler.guard.ts # Rate limiting
+```
+
+MongoDB schemas to define:
+- Product: { name, price, sku, stock, categoryId, shopId, tags[], status, images[], ratings }
+- Order: { items[{productId, qty, price}], total, status, channel, customerId, posTerminalId }
+- Customer: { name, email, phone, addresses[], totalOrders, totalSpent }
+- Page: { title, slug, status, blocks[{type, data}], publishedAt, authorId }
+- Category: { name, icon, parentId, count }
+
+Redis key patterns:
+- session:{userId}          → JWT session (TTL: 7d)
+- pos:cart:{terminalId}     → Hash of cart items (TTL: 4h)
+- cache:products:{hash}     → Product list cache (TTL: 5m)
+- cache:categories          → Category tree (TTL: 1h)
+- stock:{productId}         → Real-time stock count (sync with MongoDB)
+- rate:{ip}:{path}          → Rate limit counter (TTL: 1m)
+
+Security requirements:
+- All routes protected by JwtAuthGuard by default
+- @Public() decorator for auth routes
+- ThrottlerModule: 100 req/min per IP
+- Helmet.js security headers
+- CORS: allow only NEXT_PUBLIC_APP_URL
+
+WebSocket events (POS gateway):
+- Client → Server: 'cart:add', 'cart:remove', 'cart:clear', 'payment:initiate'
+- Server → Client: 'cart:updated', 'payment:confirmed', 'payment:failed', 'stock:updated'
+
+Start by: creating main.ts with full bootstrap config, then app.module.ts, then auth module.
+Read AGENTS.md, SKILL.md, and HISTORY.md before starting.
+
+---------------------
+Part 3
+---------------------
+
+You are setting up the data layer for Kraft Market: MongoDB 7 (via Mongoose) + Redis 7 (ioredis).
+
+Context:
+- Backend: NestJS 10
+- ODM: Mongoose with @nestjs/mongoose
+- Redis client: ioredis via a global NestJS module
+
+Task 1 — Mongoose Schemas (TypeScript):
+Create complete schemas with validators, indexes, and virtuals for:
+
+1. ProductSchema
+   - name (required, string, min 2)
+   - price (required, number, min 0)
+   - sku (unique, auto-generate if empty: KRF-{timestamp})
+   - stock (default 0)
+   - categoryId (ObjectId ref Category)
+   - shopId (ObjectId ref Shop)
+   - tags (string[])
+   - images (string[], URLs)
+   - status ('active' | 'draft' | 'archived', default 'active')
+   - rating (average, recomputed on review add)
+   - reviewCount (number)
+   - soldCount (number)
+   - Index: { status: 1, categoryId: 1 }, { name: 'text', tags: 'text' } (full-text search)
+
+2. OrderSchema (with embedded items)
+   - items: [{ productId, name, price, qty, image }]
+   - subtotal, vat (7%), total
+   - status ('pending' | 'paid' | 'shipped' | 'completed' | 'cancelled')
+   - channel ('online' | 'pos')
+   - customerId (ObjectId, optional for POS walk-in)
+   - posTerminalId (string, for POS orders)
+   - paymentMethod ('cash' | 'promptpay' | 'card')
+   - receiptNumber (unique, auto: KRF-{YYYYMMDD}-{seq})
+   - Index: { status: 1 }, { createdAt: -1 }, { customerId: 1 }
+
+3. PageSchema (CMS)
+   - title, slug (unique, auto-generated from title)
+   - status ('draft' | 'published' | 'scheduled')
+   - blocks: [{ id, type, data: Mixed, order: Number }]
+   - authorId (ObjectId ref User)
+   - publishedAt, scheduledAt
+   - Index: { slug: 1, status: 1 }
+
+Task 2 — Redis Module (NestJS global):
+```typescript
+// redis.module.ts
+import Redis from 'ioredis';
+
+@Global()
+@Module({
+  providers: [{
+    provide: 'REDIS_CLIENT',
+    useFactory: (config: ConfigService) => {
+      const redis = new Redis(config.get('REDIS_URL'));
+      redis.on('error', (err) => console.error('Redis error:', err));
+      return redis;
+    },
+    inject: [ConfigService],
+  }],
+  exports: ['REDIS_CLIENT'],
+})
+export class RedisModule {}
+```
+
+Task 3 — Cache-aside service helper:
+```typescript
+async getCached<T>(key: string, ttl: number, fn: () => Promise<T>): Promise<T>
+async invalidate(pattern: string): Promise<void>  // uses SCAN + DEL
+```
+
+Task 4 — Seed script (src/seed.ts):
+Create KRAFT_DATA seed from the prototype data.js, inserting:
+- 8 categories, 12 products, 8 orders, 6 pages into MongoDB
+- Populate Redis stock:{productId} keys from product.stock values
+- Use idempotent upserts (findOneAndUpdate with upsert: true)
+
+Task 5 — MongoDB aggregation for Dashboard:
+```
+- Daily sales for last 30 days (grouped by date, split online vs POS)
+- Top 5 products by soldCount this month
+- Order status breakdown (count per status)
+- Customer LTV top 10
+```
+
+Read AGENTS.md, SKILL.md, and HISTORY.md before starting.
+
+---------------------
+Part 3
+---------------------
+
+You are bootstrapping the complete Kraft Market monorepo from scratch.
+
+Project: Kraft Market — Thai e-commerce platform (Shopee-style storefront + WordPress-style CMS + POS terminal)
+
+Tech stack:
+- Frontend: Next.js 14 (App Router, TypeScript, Tailwind)
+- Backend: NestJS 10 (REST + WebSocket, TypeScript)
+- Database: MongoDB 7 (Mongoose)
+- Cache: Redis 7 (ioredis)
+- Infra: Docker Compose + Nginx
+
+Step 1 — Monorepo structure:
+```
+kraft-market/
+├── frontend/              # Next.js
+├── backend/               # NestJS
+├── infra/
+│   ├── docker-compose.yml # All services
+│   ├── nginx.conf         # Reverse proxy + TLS
+│   └── mongo-init.js      # DB init script
+├── AGENTS.md              # AI agent instructions
+├── SKILL.md               # Debugging playbook
+└── HISTORY.md             # Session log
+```
+
+Step 2 — Docker Compose (infra/docker-compose.yml):
+Services: frontend (3000), backend (3001), mongo (27017), redis (6379), nginx (80/443)
+- mongo: image mongo:7, volume, auth enabled
+- redis: image redis:7-alpine, requirepass, maxmemory 256mb allkeys-lru
+- nginx: proxy /api/* → backend, /socket.io/* → backend (ws), /* → frontend
+
+Step 3 — Environment files:
+```bash
+# backend/.env
+NODE_ENV=development
+PORT=3001
+MONGO_URI=mongodb://admin:kraftpass@mongo:27017/kraft?authSource=admin
+REDIS_URL=redis://:kraftredis@redis:6379
+JWT_SECRET=<generate-256-bit-random>
+JWT_EXPIRES=7d
+CORS_ORIGIN=http://localhost:3000
+
+# frontend/.env.local
+NEXT_PUBLIC_API_URL=http://localhost:3001/api
+NEXT_PUBLIC_WS_URL=ws://localhost:3001
+```
+
+Step 4 — Bootstrap commands:
+```bash
+# Backend
+cd backend
+npm init -y
+npm install @nestjs/core @nestjs/common @nestjs/platform-express @nestjs/mongoose @nestjs/jwt @nestjs/passport @nestjs/websockets @nestjs/platform-socket.io mongoose ioredis passport passport-jwt @nestjs/config @nestjs/throttler helmet class-validator class-transformer bcryptjs
+npm install -D @nestjs/cli typescript @types/node @types/passport-jwt
+
+# Frontend
+cd frontend
+npx create-next-app@latest . --typescript --tailwind --app --src-dir --import-alias "@/*"
+npm install swr zustand
+```
+
+Step 5 — Key interfaces (shared types):
+```typescript
+interface Product { _id: string; name: string; price: number; stock: number; status: string; }
+interface Order { _id: string; items: OrderItem[]; total: number; status: string; channel: 'online'|'pos'; }
+interface CartItem { productId: string; name: string; price: number; qty: number; }
+```
+
+Step 6 — Start with these files in order:
+1. infra/docker-compose.yml
+2. backend/src/main.ts + app.module.ts
+3. backend/src/auth/* (JWT module)
+4. backend/src/products/* (CRUD + cache)
+5. frontend/app/layout.tsx
+6. frontend/app/(store)/page.tsx
+
+After each file, update HISTORY.md with what was created.
+Read AGENTS.md, SKILL.md, and HISTORY.md before starting any work.
+
+---------------------
+Part 4
+---------------------
+
+You are bootstrapping the complete Kraft Market monorepo from scratch.
+
+Project: Kraft Market — Thai e-commerce platform (Shopee-style storefront + WordPress-style CMS + POS terminal)
+
+Tech stack:
+- Frontend: Next.js 14 (App Router, TypeScript, Tailwind)
+- Backend: NestJS 10 (REST + WebSocket, TypeScript)
+- Database: MongoDB 7 (Mongoose)
+- Cache: Redis 7 (ioredis)
+- Infra: Docker Compose + Nginx
+
+Step 1 — Monorepo structure:
+```
+kraft-market/
+├── frontend/              # Next.js
+├── backend/               # NestJS
+├── infra/
+│   ├── docker-compose.yml # All services
+│   ├── nginx.conf         # Reverse proxy + TLS
+│   └── mongo-init.js      # DB init script
+├── AGENTS.md              # AI agent instructions
+├── SKILL.md               # Debugging playbook
+└── HISTORY.md             # Session log
+```
+
+Step 2 — Docker Compose (infra/docker-compose.yml):
+Services: frontend (3000), backend (3001), mongo (27017), redis (6379), nginx (80/443)
+- mongo: image mongo:7, volume, auth enabled
+- redis: image redis:7-alpine, requirepass, maxmemory 256mb allkeys-lru
+- nginx: proxy /api/* → backend, /socket.io/* → backend (ws), /* → frontend
+
+Step 3 — Environment files:
+```bash
+# backend/.env
+NODE_ENV=development
+PORT=3001
+MONGO_URI=mongodb://admin:kraftpass@mongo:27017/kraft?authSource=admin
+REDIS_URL=redis://:kraftredis@redis:6379
+JWT_SECRET=<generate-256-bit-random>
+JWT_EXPIRES=7d
+CORS_ORIGIN=http://localhost:3000
+
+# frontend/.env.local
+NEXT_PUBLIC_API_URL=http://localhost:3001/api
+NEXT_PUBLIC_WS_URL=ws://localhost:3001
+```
+
+Step 4 — Bootstrap commands:
+```bash
+# Backend
+cd backend
+npm init -y
+npm install @nestjs/core @nestjs/common @nestjs/platform-express @nestjs/mongoose @nestjs/jwt @nestjs/passport @nestjs/websockets @nestjs/platform-socket.io mongoose ioredis passport passport-jwt @nestjs/config @nestjs/throttler helmet class-validator class-transformer bcryptjs
+npm install -D @nestjs/cli typescript @types/node @types/passport-jwt
+
+# Frontend
+cd frontend
+npx create-next-app@latest . --typescript --tailwind --app --src-dir --import-alias "@/*"
+npm install swr zustand
+```
+
+Step 5 — Key interfaces (shared types):
+```typescript
+interface Product { _id: string; name: string; price: number; stock: number; status: string; }
+interface Order { _id: string; items: OrderItem[]; total: number; status: string; channel: 'online'|'pos'; }
+interface CartItem { productId: string; name: string; price: number; qty: number; }
+```
+
+Step 6 — Start with these files in order:
+1. infra/docker-compose.yml
+2. backend/src/main.ts + app.module.ts
+3. backend/src/auth/* (JWT module)
+4. backend/src/products/* (CRUD + cache)
+5. frontend/app/layout.tsx
+6. frontend/app/(store)/page.tsx
+
+After each file, update HISTORY.md with what was created.
+Read AGENTS.md, SKILL.md, and HISTORY.md before starting any work.
+
+---------------------
+Part 5
+---------------------
+
+You are implementing the POS Terminal feature for Kraft Market.
+
+Context:
+- NestJS backend with Socket.IO (@nestjs/websockets)
+- Redis for cart state (TTL 4 hours per terminal)
+- MongoDB for order persistence
+- Next.js frontend with real-time UI
+
+Backend — POS Gateway (WebSocket):
+```
+Namespace: /pos
+Events to handle:
+  Client → Server:
+    'terminal:open'       { terminalId, staffId }   → load cart from Redis, emit 'cart:loaded'
+    'cart:add'            { terminalId, productId, qty }  → HSET cart, check stock, emit 'cart:updated'
+    'cart:remove'         { terminalId, productId }  → HDEL, emit 'cart:updated'
+    'cart:clear'          { terminalId }             → DEL cart key, emit 'cart:cleared'
+    'payment:initiate'    { terminalId, method }     → lock stock (Redis SETNX), emit 'payment:processing'
+    'payment:confirm'     { terminalId }             → create Order (MongoDB), clear cart, emit 'payment:success'
+    'payment:cancel'      { terminalId }             → release lock, emit 'payment:cancelled'
+
+  Server → Client:
+    'cart:loaded'         { items[], total, vat }
+    'cart:updated'        { items[], total, vat }
+    'payment:processing'  { orderId, amount, qrUrl? }
+    'payment:success'     { orderId, receiptNumber }
+    'payment:failed'      { reason }
+    'stock:alert'         { productId, remaining }   → when stock < 5
+```
+
+Redis POS cart schema:
+```
+Key: pos:cart:{terminalId}   (Hash, TTL 4h)
+Fields: {productId} → JSON string of { productId, name, price, qty, image }
+
+Key: pos:lock:{orderId}      (String "1", TTL 30s)
+Key: pos:terminal:{terminalId} → { staffId, openedAt, shiftTotal }
+```
+
+Stock reservation flow (race-condition safe):
+```typescript
+// Lua script for atomic stock check + decrement
+const decrementStock = `
+  local stock = tonumber(redis.call('GET', KEYS[1]))
+  if stock == nil then return -1 end
+  if stock < tonumber(ARGV[1]) then return 0 end
+  return redis.call('DECRBY', KEYS[1], ARGV[1])
+`;
+```
+
+Payment methods:
+1. Cash: immediate confirm → create order
+2. PromptPay: generate QR (Thai QR Prompt Pay spec), poll payment gateway every 3s, timeout 5min
+3. Card: call card terminal API → await callback webhook
+
+Frontend — POS Terminal page (app/admin/pos/page.tsx):
+```
+Layout: full-height, no scroll
+├── POS Header: terminal info, shift total, quick actions
+├── Left panel (flex: 1): product search/scan, category chips, product grid
+└── Right panel (420px): current bill header, cart items, totals (subtotal/VAT/discount/total), payment buttons
+
+Payment modal (not position:fixed — use faux-viewport div):
+├── Cash: numpad for amount received, change calculation
+├── PromptPay: QR code SVG (200x200), amount, polling indicator, timeout countdown
+└── Card: "กำลังรอสัญญาณจากเครื่องรูด..." + cancel button
+
+Real-time stock badge: show red badge on product card when stock < 5
+```
+
+Receipt generation:
+- Use @react-pdf/renderer for PDF receipt
+- Fields: shop name, receipt #, date, items, subtotal, VAT 7%, total, payment method, cashier name
+- Endpoint: GET /api/pos/receipt/:orderId → PDF buffer
+
+Read AGENTS.md, SKILL.md, and HISTORY.md before starting.
+
+---------------------
+Part 6
+---------------------
+
+You are hardening the security and setting up production infrastructure for Kraft Market.
+
+Security checklist to implement (NestJS backend):
+
+1. Helmet.js — security headers:
+```typescript
+// main.ts
+import helmet from 'helmet';
+app.use(helmet({
+  contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], imgSrc: ["'self'", 'data:', 'https:'] } },
+  crossOriginEmbedderPolicy: false,
+}));
+```
+
+2. Rate limiting — ThrottlerModule:
+```typescript
+ThrottlerModule.forRoot([
+  { name: 'short', ttl: 1000, limit: 10 },    // 10 req/sec
+  { name: 'long',  ttl: 60000, limit: 100 },  // 100 req/min
+])
+// Stricter for auth endpoints
+@Throttle({ short: { limit: 3, ttl: 60000 } })
+@Post('login')
+```
+
+3. JWT Auth with Redis session blacklist:
+```typescript
+// On logout: add token to Redis blacklist
+await redis.setex(`blacklist:${jti}`, jwtExpiry - Date.now() / 1000, '1');
+// In JWT strategy: check blacklist before allowing request
+const blacklisted = await redis.get(`blacklist:${payload.jti}`);
+if (blacklisted) throw new UnauthorizedException();
+```
+
+4. Input validation — global ValidationPipe:
+```typescript
+app.useGlobalPipes(new ValidationPipe({
+  whitelist: true,           // strip unknown fields
+  forbidNonWhitelisted: true,
+  transform: true,
+  transformOptions: { enableImplicitConversion: true },
+}));
+```
+
+5. MongoDB injection prevention:
+```typescript
+// Never use raw strings in queries
+// ❌ Wrong: Model.find({ name: req.body.name })
+// ✅ Right: always use DTOs + class-validator @IsString() @MaxLength()
+```
+
+6. CORS — strict origin:
+```typescript
+app.enableCors({
+  origin: process.env.CORS_ORIGIN?.split(',') ?? ['http://localhost:3000'],
+  credentials: true,
+  methods: ['GET','POST','PUT','PATCH','DELETE'],
+});
+```
+
+Docker Compose (production):
+```yaml
+version: '3.9'
+services:
+  mongo:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASS}
+    volumes: [mongo_data:/data/db, ./infra/mongo-init.js:/docker-entrypoint-initdb.d/init.js]
+    networks: [internal]
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASS} --maxmemory 512mb --maxmemory-policy allkeys-lru --save 60 1
+    volumes: [redis_data:/data]
+    networks: [internal]
+
+  backend:
+    build: { context: ./backend, dockerfile: Dockerfile }
+    environment:
+      NODE_ENV: production
+      MONGO_URI: mongodb://admin:${MONGO_PASS}@mongo:27017/kraft?authSource=admin
+      REDIS_URL: redis://:${REDIS_PASS}@redis:6379
+    depends_on: [mongo, redis]
+    networks: [internal, public]
+
+  frontend:
+    build: { context: ./frontend, dockerfile: Dockerfile }
+    depends_on: [backend]
+    networks: [public]
+
+  nginx:
+    image: nginx:1.25-alpine
+    ports: ['80:80', '443:443']
+    volumes: [./infra/nginx.conf:/etc/nginx/nginx.conf:ro, ./infra/certs:/etc/nginx/certs:ro]
+    networks: [public]
+
+networks:
+  internal: { internal: true }
+  public:
+volumes:
+  mongo_data:
+  redis_data:
+```
+
+Nginx config (infra/nginx.conf):
+```nginx
+upstream backend  { server backend:3001;  keepalive 32; }
+upstream frontend { server frontend:3000; keepalive 32; }
+
+server {
+  listen 80; server_name kraftmarket.com;
+  return 301 https://$host$request_uri;
+}
+
+server {
+  listen 443 ssl http2;
+  server_name kraftmarket.com;
+  ssl_certificate     /etc/nginx/certs/cert.pem;
+  ssl_certificate_key /etc/nginx/certs/key.pem;
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+
+  add_header X-Frame-Options DENY;
+  add_header X-Content-Type-Options nosniff;
+  add_header Referrer-Policy strict-origin-when-cross-origin;
+
+  location /api/ {
+    proxy_pass http://backend;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    limit_req zone=api burst=20 nodelay;
+  }
+
+  location /socket.io/ {
+    proxy_pass http://backend;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_read_timeout 86400;
+  }
+
+  location / {
+    proxy_pass http://frontend;
+    proxy_cache_valid 200 1m;
+  }
+}
+
+limit_req_zone $binary_remote_addr zone=api:10m rate=60r/m;
+```
+
+CI/CD checklist:
+- [ ] .env.example committed (no real values)
+- [ ] .env in .gitignore
+- [ ] Secrets in GitHub Actions secrets / Vault
+- [ ] Docker image scanned with Trivy before push
+- [ ] MongoDB user has least-privilege access (readWrite on kraft db only)
+- [ ] Redis bind to internal network only (not exposed on 6379)
+- [ ] Log sensitive field masking (password, card numbers, tokens)
+- [ ] Health check endpoints: GET /api/health (backend), /api/health/mongo, /api/health/redis
+
+Read AGENTS.md, SKILL.md, and HISTORY.md before starting.
+
+Create Docker all backend and frontend and redis and mongodb
