@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto, RegisterDto } from './auth.dto';
@@ -24,6 +24,7 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @HttpCode(200)
   @Post('logout')
   logout(@Req() req: any) {
     return this.authService.logout(req.user.jti, req.user.exp);

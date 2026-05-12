@@ -1,3 +1,21 @@
+## Session 2026-05-12 (ต่อ 4) — Fix page creation 500 + add public CMS page route
+
+**สิ่งที่ทำ:**
+- แก้ bug 500 ตอนสร้างหน้าใหม่: เปลี่ยน `pre('save')` → `pre('validate')` ใน `page.schema.ts` เพื่อให้ auto-generate slug ก่อน Mongoose validation ทำงาน. เพิ่ม fallback `page-{timestamp}` กรณี title เป็นภาษาไทยล้วน (slugify strip ทุก char)
+- สร้าง `frontend/app/[slug]/page.tsx` — dynamic CMS page renderer สำหรับ public pages โดย fetch `/api/pages/slug/:slug` แล้ว render blocks (hero, heading, text, image, cta, columns, testimonials). แสดง 404 หน้า friendly เมื่อ page ไม่มีหรือ status ไม่ใช่ published
+
+**ไฟล์ที่แก้ไข/เพิ่ม:**
+- `backend/src/pages/page.schema.ts` (แก้ไข — pre('save') → pre('validate') + timestamp fallback)
+- `frontend/app/[slug]/page.tsx` (ใหม่ — public CMS page renderer)
+
+**Schema changes:** ไม่มี
+
+**Known issues / TODO:**
+- Thai title → slug เป็น `page-{timestamp}` แทนที่จะเป็น Thai romanization — ยังใช้งานได้ แต่ไม่สวย (TODO: เพิ่ม Thai transliteration library)
+- `/[slug]` route อาจ conflict กับ future top-level routes ที่ยังไม่ได้สร้าง
+
+---
+
 ## Session 2026-05-12 (ต่อ 3) — Wire checkout + SETUP.md
 
 **สิ่งที่ทำ:**

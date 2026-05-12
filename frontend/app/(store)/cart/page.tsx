@@ -59,7 +59,7 @@ export default function CartPage() {
             qty: i.qty,
             image: i.image,
           })),
-          paymentMethod,
+          paymentMethod: payMethod,
           shippingName: info.name,
           shippingPhone: info.phone,
           shippingEmail: info.email,

@@ -20,7 +20,7 @@ class CreateOnlineOrderDto {
   @IsArray() @ArrayMinSize(1) @ValidateNested({ each: true }) @Type(() => OrderItemDto)
   items: OrderItemDto[];
 
-  @IsEnum(['promptpay', 'card']) paymentMethod: 'promptpay' | 'card';
+  @IsEnum({ promptpay: 'promptpay', card: 'card' }) paymentMethod: 'promptpay' | 'card';
   @IsOptional() @IsString() customerId?: string;
   @IsOptional() @IsString() note?: string;
   // Shipping info (stored in note for simplicity)

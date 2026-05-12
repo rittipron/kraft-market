@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Page, PageDocument } from './page.schema';
@@ -26,7 +26,12 @@ export class PagesService {
   }
 
   async create(data: any, authorId: string): Promise<PageDocument> {
-    return this.pageModel.create({ ...data, authorId });
+    try {
+      return await this.pageModel.create({ ...data, authorId });
+    } catch (e: any) {
+      if (e?.code === 11000) throw new ConflictException('Slug already exists');
+      throw e;
+    }
   }
 
   async update(id: string, data: any): Promise<PageDocument> {

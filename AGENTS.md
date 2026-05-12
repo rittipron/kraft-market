@@ -1,18 +1,30 @@
 # AGENTS.md — Kraft CMS + Commerce + POS
 
-> **สำหรับ AI Agent / Coding Assistant ทุกตัว**
-> อ่านไฟล์นี้ก่อนเสมอ → จากนั้นอ่าน **`SKILL.md`** → แล้วตามด้วย **`HISTORY.md`**
-> ลำดับนี้บังคับ ห้ามข้าม
+> **สำหรับ AI Agent / Coding Assistant ทุกตัว** — อ่านไฟล์นี้ก่อนเสมอ ลำดับนี้บังคับ ห้ามข้าม
 
 ---
 
 ## 0. Reading Order (บังคับ)
 
+### 🛠️ DEV Agent
 ```
-1. AGENTS.md    ← ไฟล์นี้  (context + rules ของโปรเจค)
-2. SKILL.md     ← debugging playbook, error patterns, self-learning loop
-3. HISTORY.md   ← บันทึกสิ่งที่ทำไปแล้ว (อย่าทำซ้ำ)
+1. AGENTS.md      ← ไฟล์นี้  (context + rules ของโปรเจค)
+2. SKILL.md       ← debugging playbook, error patterns, self-learning loop
+3. HISTORY.md     ← บันทึกสิ่งที่ทำไปแล้ว (อย่าทำซ้ำ)
+4. QAHISTORY.md   ← ดู bug ที่ QA report ไว้ → แก้ตาม severity
 ```
+
+### 🧪 QA Agent
+```
+1. QAAGENTS.md    ← rules + test methodology ของ QA
+2. HISTORY.md     ← ดูว่า Dev ทำอะไรไปแล้ว → กำหนด test scope
+3. QAHISTORY.md   ← ดู test ที่รันไปแล้ว อย่าทำซ้ำ
+4. AGENTS.md      ← (optional) ถ้าต้องการเข้าใจ architecture ลึกขึ้น
+```
+
+> **หลังทำงานเสร็จทุก session:**
+> - DEV → อัพเดต `HISTORY.md`
+> - QA → อัพเดต `QAHISTORY.md` + บันทึก bug ที่เจอ
 
 ---
 

@@ -87,7 +87,7 @@ export default function PageBuilderPage() {
   const save = async () => {
     setSaving(true);
     try {
-      const data = { title, blocks, status: 'draft' };
+      const data = { title, blocks, status: 'draft' as const };
       if (savedId) {
         await updatePage(savedId, data);
       } else {

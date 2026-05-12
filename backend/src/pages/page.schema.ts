@@ -50,9 +50,10 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-PageSchema.pre('save', function (next) {
+// pre('validate') runs before Mongoose required-field check, so slug gets generated first
+PageSchema.pre('validate', function (next) {
   if (!this.slug && this.title) {
-    this.slug = slugify(this.title);
+    this.slug = slugify(this.title) || `page-${Date.now()}`;
   }
   next();
 });

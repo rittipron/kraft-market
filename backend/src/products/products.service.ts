@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, Model } from 'mongoose';
 import { createHash } from 'crypto';
@@ -48,10 +48,15 @@ export class ProductsService {
   }
 
   async create(dto: CreateProductDto): Promise<ProductDocument> {
-    const product = await this.productModel.create(dto);
-    await this.invalidateCache();
-    await this.syncStock(product._id.toString(), product.stock);
-    return product;
+    try {
+      const product = await this.productModel.create(dto);
+      await this.invalidateCache();
+      await this.syncStock(product._id.toString(), product.stock);
+      return product;
+    } catch (e: any) {
+      if (e?.code === 11000) throw new ConflictException('SKU already exists');
+      throw e;
+    }
   }
 
   async update(id: string, dto: UpdateProductDto): Promise<ProductDocument> {
