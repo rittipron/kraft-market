@@ -20,6 +20,21 @@ export class User {
 
   @Prop({ default: true })
   isActive: boolean;
+
+  @Prop({ type: [String], default: [] })
+  menuPermissions: string[];
+
+  @Prop({ default: '' })
+  phone: string;
+
+  @Prop({ default: '' })
+  avatarUrl: string;
+
+  @Prop({ default: 'local', enum: ['local', 'google', 'facebook'] })
+  provider: string;
+
+  @Prop({ default: '' })
+  providerId: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

@@ -90,9 +90,9 @@ export default function PagesAdminPage() {
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-3">
                         <a href={`/admin/builder?id=${page._id}`} className="text-xs text-[var(--teal)] hover:underline">แก้ไข</a>
-                        {page.status === 'published' && (
-                          <a href={`/${page.slug}`} target="_blank" className="text-xs text-[var(--ink-4)] hover:underline">ดูหน้า</a>
-                        )}
+                        <a href={`/${page.slug}?preview=1`} target="_blank" className="text-xs text-[var(--ink-4)] hover:underline">
+                          ดูหน้า ↗
+                        </a>
                         <button
                           onClick={() => handleDelete(page._id, page.title)}
                           className="text-xs text-red-400 hover:text-red-600"

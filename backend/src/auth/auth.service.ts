@@ -55,6 +55,31 @@ export class AuthService {
     }
   }
 
+  async findOrCreateOAuthUser(profile: {
+    provider: string;
+    providerId: string;
+    email: string;
+    name: string;
+    avatarUrl?: string;
+  }) {
+    let user = await this.userModel.findOne({ provider: profile.provider, providerId: profile.providerId }).lean();
+    if (!user) {
+      user = await this.userModel.findOne({ email: profile.email }).lean();
+    }
+    if (!user) {
+      user = await this.userModel.create({
+        email: profile.email,
+        name: profile.name,
+        password: '',
+        role: 'customer',
+        provider: profile.provider,
+        providerId: profile.providerId,
+        avatarUrl: profile.avatarUrl ?? '',
+      });
+    }
+    return this.signToken(user);
+  }
+
   async isBlacklisted(jti: string): Promise<boolean> {
     const val = await this.redis.get(`blacklist:${jti}`);
     return val === '1';
@@ -62,11 +87,11 @@ export class AuthService {
 
   private signToken(user: any) {
     const jti = uuidv4();
-    const payload = { sub: user._id.toString(), email: user.email, role: user.role, jti };
+    const payload = { sub: user._id.toString(), email: user.email, role: user.role, jti, menuPermissions: user.menuPermissions ?? [] };
     const token = this.jwtService.sign(payload);
     return {
       accessToken: token,
-      user: { id: user._id, email: user.email, name: user.name, role: user.role },
+      user: { id: user._id, email: user.email, name: user.name, role: user.role, menuPermissions: user.menuPermissions ?? [] },
     };
   }
 }

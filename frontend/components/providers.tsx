@@ -1,6 +1,7 @@
 'use client';
 
 import { SWRConfig } from 'swr';
+import { AuthModal } from './store/AuthModal';
 
 const fetcher = (url: string) =>
   fetch(url).then((res) => {
@@ -12,6 +13,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SWRConfig value={{ fetcher, revalidateOnFocus: false }}>
       {children}
+      <AuthModal />
     </SWRConfig>
   );
 }

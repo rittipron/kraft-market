@@ -42,9 +42,14 @@ export class ProductsService {
   }
 
   async findOne(id: string): Promise<ProductDocument> {
-    const product = await this.productModel.findById(id).lean();
+    let product: ProductDocument | null;
+    try {
+      product = await this.productModel.findById(id).lean() as unknown as ProductDocument | null;
+    } catch {
+      throw new NotFoundException('Product not found');
+    }
     if (!product) throw new NotFoundException('Product not found');
-    return product as unknown as ProductDocument;
+    return product;
   }
 
   async create(dto: CreateProductDto): Promise<ProductDocument> {

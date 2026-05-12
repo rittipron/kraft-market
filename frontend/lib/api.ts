@@ -57,6 +57,42 @@ export const login = (email: string, password: string) =>
   apiFetch<{ accessToken: string; user: User }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
 export const logout = () => apiFetch('/auth/logout', { method: 'POST' });
 
+// ── Nav ──
+export const getPublicNav = () => apiFetch<NavItem[]>('/nav/public');
+export const getAdminNav = () => apiFetch<NavItem[]>('/nav');
+export const createNavItem = (data: Partial<NavItem>) => apiFetch<NavItem>('/nav', { method: 'POST', body: JSON.stringify(data) });
+export const updateNavItem = (id: string, data: Partial<NavItem>) => apiFetch<NavItem>(`/nav/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+export const deleteNavItem = (id: string) => apiFetch(`/nav/${id}`, { method: 'DELETE' });
+export const reorderNav = (items: { id: string; order: number }[]) => apiFetch('/nav/reorder', { method: 'PATCH', body: JSON.stringify({ items }) });
+
+// ── Customer Auth ──
+export const customerLogin = (email: string, password: string) =>
+  apiFetch<{ accessToken: string; user: User }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+export const customerRegister = (email: string, password: string, name: string) =>
+  apiFetch<{ accessToken: string; user: User }>('/auth/register', { method: 'POST', body: JSON.stringify({ email, password, name }) });
+export const getMyProfile = () => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('kraft_customer_token') : null;
+  return fetch(`${BASE_URL}/customers/me`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json());
+};
+export const updateMyProfile = (data: { name?: string; phone?: string; avatarUrl?: string }) => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('kraft_customer_token') : null;
+  return fetch(`${BASE_URL}/customers/me`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(data) }).then(r => r.json());
+};
+export const getMyOrders = () => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('kraft_customer_token') : null;
+  return fetch(`${BASE_URL}/customers/me/orders`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json());
+};
+
+// ── Staff ──
+export const getStaff = () => apiFetch<StaffMember[]>('/staff');
+export const createStaff = (data: { email: string; name: string; password: string; menuPermissions?: string[] }) =>
+  apiFetch<StaffMember>('/staff', { method: 'POST', body: JSON.stringify(data) });
+export const updateStaff = (id: string, data: Partial<{ name: string; email: string; password: string; isActive: boolean }>) =>
+  apiFetch<StaffMember>(`/staff/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
+export const updateStaffPermissions = (id: string, menuPermissions: string[]) =>
+  apiFetch<StaffMember>(`/staff/${id}/permissions`, { method: 'PATCH', body: JSON.stringify({ menuPermissions }) });
+export const deleteStaff = (id: string) => apiFetch(`/staff/${id}`, { method: 'DELETE' });
+
 // ── Health ──
 export const getHealth = () => apiFetch<{ status: string }>('/health');
 
@@ -131,6 +167,33 @@ export interface User {
   email: string;
   name: string;
   role: string;
+  menuPermissions?: string[];
+  phone?: string;
+  avatarUrl?: string;
+  provider?: string;
+}
+
+export interface StaffMember {
+  _id: string;
+  email: string;
+  name: string;
+  role: string;
+  isActive: boolean;
+  menuPermissions: string[];
+  createdAt: string;
+}
+
+export interface NavItem {
+  _id: string;
+  label: string;
+  type: 'url' | 'page' | 'category';
+  url?: string;
+  pageId?: string;
+  categoryId?: string;
+  parentId?: string | null;
+  order: number;
+  isVisible: boolean;
+  openInNewTab: boolean;
 }
 
 export interface DashboardStats {

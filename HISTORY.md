@@ -1,3 +1,78 @@
+## Session 2026-05-12 (ต่อ 7) — Bug fixes (images + uploads) + Staff Management feature
+
+**สิ่งที่ทำ:**
+- แก้ Bug: `@IsUrl({ require_tld: false })` ใน `product.dto.ts` ให้รับ `http://localhost/...` ได้
+- แก้ Bug: รูปใน Media Library ไม่แสดง — เปลี่ยน nginx จาก `proxy_pass http://backend` เป็น `alias /srv/uploads/` โดยต่อ volume `uploads_data` ตรงกับ nginx container
+- Feature: Staff Management — `GET/POST/PATCH/DELETE /api/staff`, `PATCH /api/staff/:id/permissions`
+- เพิ่ม `menuPermissions: string[]` ใน User schema และ JWT payload
+- `frontend/app/admin/staff/page.tsx` — CRUD staff + permission modal (checkbox 11 เมนู), toggle active
+- `AdminSidebar` — parse JWT, role=staff เห็นเฉพาะ menuPermissions, role=admin เห็นทั้งหมด
+
+**ไฟล์ที่แก้ไข/เพิ่ม:**
+- `backend/src/products/product.dto.ts`, `auth/user.schema.ts`, `auth/auth.service.ts`
+- `backend/src/staff/staff.controller.ts`, `staff/staff.module.ts` (ใหม่)
+- `backend/src/app.module.ts`
+- `frontend/app/admin/staff/page.tsx` (ใหม่)
+- `frontend/components/admin/AdminSidebar.tsx`
+- `frontend/lib/api.ts` (staff API + StaffMember type)
+- `infra/nginx.dev.conf`, `infra/docker-compose.dev.yml`
+
+**Schema changes:** เพิ่ม `menuPermissions: string[]` ใน User collection (default [])
+
+**Known issues / TODO:**
+- Staff ต้อง logout → login ใหม่หลัง admin อัปเดต permissions (JWT ไม่ refresh อัตโนมัติ)
+
+---
+
+## Session 2026-05-12 (ต่อ 6) — Analytics, Customers, Media, Settings, Product Images
+
+**สิ่งที่ทำ:**
+- Backend: `MediaModule` — multer upload (diskStorage, 5MB), `GET/POST/DELETE /media`
+- Backend: `SettingsModule` — singleton `GET /settings` (public), `PATCH /settings` (admin)
+- Backend: customer aggregation จาก order.note → `GET /orders/customers`
+- Backend: `NestExpressApplication` + `useStaticAssets` สำหรับ uploads
+- Frontend: analytics, customers, media, settings pages ครบ
+- Frontend: `ImageManager` component + integrate ใน products/new + products/[id]
+- infra: `uploads_data` volume, `UPLOADS_DIR` env, nginx `/uploads/` location
+
+**ไฟล์ที่แก้ไข/เพิ่ม:**
+- `backend/src/media/`, `backend/src/settings/` (ใหม่ทั้งหมด)
+- `backend/src/orders/orders.service.ts`, `orders.controller.ts`
+- `backend/src/main.ts`, `backend/package.json` (@types/multer)
+- `frontend/app/admin/{analytics,customers,media,settings}/page.tsx` (ใหม่)
+- `frontend/components/admin/ImageManager.tsx` (ใหม่)
+- `frontend/app/admin/products/new/page.tsx`, `[id]/page.tsx`
+- `infra/docker-compose.yml`, `docker-compose.dev.yml`, `nginx.dev.conf`
+
+**Schema changes:** Settings schema ใหม่ (singleton pattern)
+
+---
+
+## Session 2026-05-12 (ต่อ 5) — Navbar system + POS stock fix + Nav admin + Bug fixes
+
+**สิ่งที่ทำ:**
+- แก้ Bug: `CastError` ObjectId invalid → NotFoundException (products + pages service)
+- แก้ Bug: Frontend crash `/products/1` — fetcher throw on `!r.ok`, null guard `?? []`
+- แก้ Bug: POS "ไม่พบสต็อก" — fetch products จาก API แทน SAMPLE_PRODUCTS
+- แก้ Bug: Nav controller import path (`../auth/decorators` → `../common/decorators`)
+- แก้ Bug: `useSearchParams()` ใน Page Builder ต้องการ Suspense wrapper
+- เพิ่ม `NavModule` + seed 5 default nav items
+- `StoreHeader` — SWR fetch nav, dropdown, mobile hamburger
+- `admin/nav/page.tsx` — CRUD + reorder + toggle visible
+- slug field ใน Page Builder (auto + manual + reset)
+
+**ไฟล์ที่แก้ไข/เพิ่ม:**
+- `backend/src/products/products.service.ts`, `pages/pages.service.ts`
+- `backend/src/nav/` (ใหม่), `backend/src/seed.ts`, `backend/src/app.module.ts`
+- `frontend/app/(store)/products/[id]/page.tsx`, `admin/pos/page.tsx`
+- `frontend/app/admin/builder/page.tsx`, `admin/nav/page.tsx` (ใหม่)
+- `frontend/components/store/StoreHeader.tsx`, `admin/AdminSidebar.tsx`
+- `frontend/lib/api.ts`
+
+**Schema changes:** เพิ่ม `NavItem` collection
+
+---
+
 ## Session 2026-05-12 (ต่อ 4) — Fix page creation 500 + add public CMS page route
 
 **สิ่งที่ทำ:**

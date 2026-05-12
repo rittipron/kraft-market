@@ -71,6 +71,55 @@ export class OrdersService {
     return order as unknown as OrderDocument;
   }
 
+  async getCustomers(page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    // Aggregate unique customers from online orders by extracting note field
+    const pipeline: any[] = [
+      { $match: { channel: 'online' } },
+      {
+        $group: {
+          _id: {
+            $cond: [
+              { $gt: ['$note', null] },
+              { $trim: { input: { $arrayElemAt: [{ $split: ['$note', ' | '] }, 0] } } },
+              'ไม่ระบุชื่อ',
+            ],
+          },
+          orderCount: { $sum: 1 },
+          totalSpent: { $sum: '$total' },
+          lastOrder: { $max: '$createdAt' },
+          firstOrder: { $min: '$createdAt' },
+          note: { $first: '$note' },
+        },
+      },
+      { $sort: { lastOrder: -1 } },
+    ];
+    const [rows, countResult] = await Promise.all([
+      this.orderModel.aggregate([...pipeline, { $skip: skip }, { $limit: limit }]),
+      this.orderModel.aggregate([...pipeline, { $count: 'total' }]),
+    ]);
+    const total = countResult[0]?.total ?? 0;
+
+    const customers = rows.map((r) => {
+      const note: string = r.note || '';
+      const extract = (key: string) => {
+        const match = note.match(new RegExp(`${key}: ([^|]+)`));
+        return match ? match[1].trim() : '';
+      };
+      return {
+        name: extract('ชื่อ') || r._id || 'ไม่ระบุ',
+        phone: extract('โทร'),
+        email: extract('อีเมล'),
+        address: extract('ที่อยู่'),
+        orderCount: r.orderCount,
+        totalSpent: r.totalSpent,
+        lastOrder: r.lastOrder,
+        firstOrder: r.firstOrder,
+      };
+    });
+    return { items: customers, total, page, limit, pages: Math.ceil(total / limit) };
+  }
+
   async getDashboardStats() {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);

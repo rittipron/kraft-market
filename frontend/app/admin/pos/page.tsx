@@ -4,8 +4,9 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { promptPayQRUrl } from '@/lib/promptpay';
 
-const PROMPTPAY_ID = '0800000001'; // ตั้งค่าเบอร์โทร/เลขประชาชนของร้าน
+const PROMPTPAY_ID = '0800000001';
 
+const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001';
 const TERMINAL_ID = 'POS-001';
 
@@ -17,21 +18,7 @@ interface CartItem {
   image?: string;
 }
 interface CartState { items: CartItem[]; subtotal: number; vat: number; total: number; }
-
-const SAMPLE_PRODUCTS = [
-  { _id: 'p1', name: 'ข้าวมันไก่ Set A', price: 65, stock: 50, image: '' },
-  { _id: 'p2', name: 'ส้มตำไทย', price: 55, stock: 30, image: '' },
-  { _id: 'p3', name: 'กาแฟดอยช้าง', price: 120, stock: 20, image: '' },
-  { _id: 'p4', name: 'น้ำผึ้งป่าแท้ 500มล.', price: 280, stock: 5, image: '' },
-  { _id: 'p5', name: 'ครีมสมุนไพรไทย', price: 350, stock: 40, image: '' },
-  { _id: 'p6', name: 'กระเป๋าสานมือ', price: 480, stock: 6, image: '' },
-  { _id: 'p7', name: 'เสื้อผ้าไหมไทย', price: 1200, stock: 8, image: '' },
-  { _id: 'p8', name: 'หูฟัง Kraft BT50', price: 1890, stock: 25, image: '' },
-  { _id: 'p9', name: 'มะม่วงน้ำดอกไม้ 1 กก.', price: 120, stock: 20, image: '' },
-  { _id: 'p10', name: 'กระทะเหล็กหล่อ 28ซม.', price: 450, stock: 10, image: '' },
-  { _id: 'p11', name: 'ผักออร์แกนิค Set', price: 89, stock: 15, image: '' },
-  { _id: 'p12', name: 'รองเท้าวิ่ง KraftRun', price: 2500, stock: 12, image: '' },
-];
+interface Product { _id: string; name: string; price: number; stock: number; images: string[]; sku: string; }
 
 type PaymentMethod = 'cash' | 'promptpay' | 'card';
 type ModalState = 'idle' | 'select' | 'cash' | 'promptpay' | 'card' | 'processing' | 'success';
@@ -43,6 +30,25 @@ export default function POSPage() {
   const [cashReceived, setCashReceived] = useState('');
   const [receipt, setReceipt] = useState<{ orderId: string; receiptNumber: string; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [search, setSearch] = useState('');
+
+  // Load real products from API
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('kraft_token') : '';
+    fetch(`${BASE}/products?limit=100&status=active`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((d) => setProducts(d.items ?? []))
+      .catch(() => {})
+      .finally(() => setProductsLoading(false));
+  }, []);
+
+  const filteredProducts = search
+    ? products.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()) || p.sku?.toLowerCase().includes(search.toLowerCase()))
+    : products;
 
   useEffect(() => {
     const socket = io(`${WS_URL}/pos`, { transports: ['websocket'] });
@@ -69,7 +75,7 @@ export default function POSPage() {
     return () => { socket.disconnect(); };
   }, []);
 
-  const addToCart = useCallback((product: (typeof SAMPLE_PRODUCTS)[0]) => {
+  const addToCart = useCallback((product: Product) => {
     socketRef.current?.emit('cart:add', {
       terminalId: TERMINAL_ID,
       productId: product._id,
@@ -105,22 +111,55 @@ export default function POSPage() {
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Products */}
-        <div className="flex-1 overflow-y-auto p-4 bg-[var(--bg)]">
-          <div className="grid grid-cols-3 xl:grid-cols-4 gap-3">
-            {SAMPLE_PRODUCTS.map((p) => (
-              <button
-                key={p._id}
-                onClick={() => addToCart(p)}
-                className="bg-[var(--surface)] rounded-xl p-3 text-left border border-[var(--line)] hover:border-[var(--coral)] hover:shadow-md transition-all active:scale-95"
-              >
-                <div className="aspect-square bg-[var(--bg-2)] rounded-lg mb-2 flex items-center justify-center text-3xl opacity-50">🛍️</div>
-                <p className="text-xs font-medium text-[var(--ink)] line-clamp-2">{p.name}</p>
-                <p className="text-[var(--coral)] font-bold text-sm mt-1">฿{p.price.toLocaleString()}</p>
-                {p.stock < 5 && (
-                  <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 bg-red-100 text-red-600 rounded-full">เหลือ {p.stock}</span>
-                )}
-              </button>
-            ))}
+        <div className="flex-1 flex flex-col overflow-hidden bg-[var(--bg)]">
+          <div className="p-3 border-b border-[var(--line)] bg-[var(--surface)]">
+            <input
+              type="search"
+              placeholder="ค้นหาสินค้า หรือ SKU..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full px-3 py-2 text-sm border border-[var(--line)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--coral)]"
+            />
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            {productsLoading ? (
+              <div className="grid grid-cols-3 xl:grid-cols-4 gap-3">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="bg-[var(--surface)] rounded-xl p-3 border border-[var(--line)] animate-pulse">
+                    <div className="aspect-square bg-[var(--bg-2)] rounded-lg mb-2" />
+                    <div className="h-3 bg-[var(--bg-2)] rounded mb-1" />
+                    <div className="h-4 bg-[var(--bg-2)] rounded w-16" />
+                  </div>
+                ))}
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="text-center py-16 text-[var(--ink-4)]">
+                <div className="text-4xl mb-2">🔍</div>
+                <p className="text-sm">{search ? `ไม่พบ "${search}"` : 'ไม่มีสินค้า'}</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 xl:grid-cols-4 gap-3">
+                {filteredProducts.map((p) => (
+                  <button
+                    key={p._id}
+                    onClick={() => addToCart(p)}
+                    disabled={p.stock === 0}
+                    className="bg-[var(--surface)] rounded-xl p-3 text-left border border-[var(--line)] hover:border-[var(--coral)] hover:shadow-md transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <div className="aspect-square bg-[var(--bg-2)] rounded-lg mb-2 flex items-center justify-center text-3xl opacity-50">
+                      {p.images?.[0] ? <img src={p.images[0]} className="w-full h-full object-cover rounded-lg" alt="" /> : '🛍️'}
+                    </div>
+                    <p className="text-xs font-medium text-[var(--ink)] line-clamp-2">{p.name}</p>
+                    <p className="text-[var(--coral)] font-bold text-sm mt-1">฿{p.price.toLocaleString()}</p>
+                    {p.stock === 0 ? (
+                      <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-full">สินค้าหมด</span>
+                    ) : p.stock < 5 ? (
+                      <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 bg-red-100 text-red-600 rounded-full">เหลือ {p.stock}</span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

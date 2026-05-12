@@ -88,3 +88,40 @@ export const useAuthStore = create<AuthState>()(
     { name: 'kraft-auth', partialize: (s) => ({ user: s.user, token: s.token }) },
   ),
 );
+
+// ── Customer Auth Store ──
+interface CustomerAuthState {
+  user: User | null;
+  token: string | null;
+  authOpen: boolean;
+  setAuth: (user: User, token: string) => void;
+  clearAuth: () => void;
+  openAuth: () => void;
+  closeAuth: () => void;
+  isLoggedIn: () => boolean;
+}
+
+export const useCustomerAuthStore = create<CustomerAuthState>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      token: null,
+      authOpen: false,
+
+      setAuth: (user, token) => {
+        localStorage.setItem('kraft_customer_token', token);
+        set({ user, token, authOpen: false });
+      },
+
+      clearAuth: () => {
+        localStorage.removeItem('kraft_customer_token');
+        set({ user: null, token: null });
+      },
+
+      openAuth: () => set({ authOpen: true }),
+      closeAuth: () => set({ authOpen: false }),
+      isLoggedIn: () => !!get().token && get().user?.role === 'customer',
+    }),
+    { name: 'kraft-customer-auth', partialize: (s) => ({ user: s.user, token: s.token }) },
+  ),
+);

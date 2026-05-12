@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { updatePage, createPage } from '@/lib/api';
+import { useState, useCallback, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { updatePage, createPage, getPageById } from '@/lib/api';
 import type { PageBlock } from '@/lib/api';
 
 const BLOCK_TYPES = [
@@ -15,6 +16,10 @@ const BLOCK_TYPES = [
   { type: 'testimonials', label: 'รีวิว', icon: '💬', defaultData: { items: [{ author: 'ลูกค้า', text: 'สินค้าดีมาก!', rating: 5 }] } },
 ];
 
+function slugify(text: string) {
+  return text.toLowerCase().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
 function BlockRenderer({ block }: { block: PageBlock }) {
   const d = block.data;
   switch (block.type) {
@@ -26,9 +31,10 @@ function BlockRenderer({ block }: { block: PageBlock }) {
           <button className="px-4 py-2 bg-[var(--coral)] text-white rounded-full text-sm">{d.buttonText}</button>
         </div>
       );
-    case 'heading':
+    case 'heading': {
       const Tag = `h${d.level || 2}` as keyof JSX.IntrinsicElements;
       return <Tag className="font-display font-bold text-xl">{d.text}</Tag>;
+    }
     case 'text':
       return <p className="text-[var(--ink-3)]">{d.content}</p>;
     case 'cta':
@@ -45,12 +51,42 @@ function BlockRenderer({ block }: { block: PageBlock }) {
 
 let blockIdCounter = 1;
 
-export default function PageBuilderPage() {
+function PageBuilderInner() {
+  const searchParams = useSearchParams();
+  const pageId = searchParams.get('id');
+
   const [title, setTitle] = useState('หน้าใหม่');
+  const [slug, setSlug] = useState('');
+  const [slugManual, setSlugManual] = useState(false);
+  const [status, setStatus] = useState<'draft' | 'published' | 'scheduled'>('draft');
   const [blocks, setBlocks] = useState<PageBlock[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [savedId, setSavedId] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(pageId);
+  const [saveMsg, setSaveMsg] = useState('');
+  const [loading, setLoading] = useState(!!pageId);
+
+  // Load existing page
+  useEffect(() => {
+    if (!pageId) return;
+    getPageById(pageId)
+      .then((page) => {
+        setTitle(page.title);
+        setSlug(page.slug);
+        setSlugManual(true);
+        setStatus(page.status);
+        setBlocks(page.blocks);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [pageId]);
+
+  // Auto-generate slug from title (only when not manually edited)
+  useEffect(() => {
+    if (slugManual) return;
+    const s = slugify(title);
+    setSlug(s || '');
+  }, [title, slugManual]);
 
   const addBlock = useCallback((type: string) => {
     const tpl = BLOCK_TYPES.find((b) => b.type === type)!;
@@ -84,19 +120,23 @@ export default function PageBuilderPage() {
     setBlocks((prev) => prev.map((b) => b.id === id ? { ...b, data: { ...b.data, [key]: value } } : b));
   }, []);
 
-  const save = async () => {
+  const save = async (publishNow = false) => {
     setSaving(true);
+    setSaveMsg('');
     try {
-      const data = { title, blocks, status: 'draft' as const };
+      const finalStatus = publishNow ? 'published' : status;
+      const data = { title, slug: slug || slugify(title) || `page-${Date.now()}`, blocks, status: finalStatus };
       if (savedId) {
         await updatePage(savedId, data);
       } else {
         const page = await createPage(data);
         setSavedId(page._id);
       }
-      alert('บันทึกสำเร็จ!');
-    } catch {
-      alert('บันทึกไม่สำเร็จ');
+      if (publishNow) setStatus('published');
+      setSaveMsg('บันทึกสำเร็จ!');
+      setTimeout(() => setSaveMsg(''), 3000);
+    } catch (e: any) {
+      setSaveMsg(e.message || 'บันทึกไม่สำเร็จ');
     } finally {
       setSaving(false);
     }
@@ -104,27 +144,42 @@ export default function PageBuilderPage() {
 
   const selectedBlock = blocks.find((b) => b.id === selected);
 
+  if (loading) return (
+    <div className="h-screen flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-[var(--coral)] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       {/* Toolbar */}
-      <div className="h-14 bg-[var(--surface)] border-b border-[var(--line)] flex items-center px-4 gap-4">
+      <div className="h-14 bg-[var(--surface)] border-b border-[var(--line)] flex items-center px-4 gap-4 shrink-0">
+        <a href="/admin/pages" className="text-sm text-[var(--ink-4)] hover:text-[var(--coral)] shrink-0">← Pages</a>
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="font-display font-bold text-lg border-none outline-none bg-transparent flex-1"
+          className="font-display font-bold text-lg border-none outline-none bg-transparent flex-1 min-w-0"
         />
-        <div className="flex items-center gap-2 ml-auto">
-          <a href="/admin/pages" className="text-sm text-[var(--ink-4)] hover:text-[var(--ink)]">← กลับ</a>
-          <button onClick={save} disabled={saving} className="px-4 py-2 bg-[var(--coral)] text-white text-sm font-semibold rounded-lg hover:bg-[var(--coral-deep)] transition-colors disabled:opacity-50">
-            {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+        {saveMsg && (
+          <span className={`text-xs shrink-0 ${saveMsg.includes('ไม่') ? 'text-red-500' : 'text-[var(--good)]'}`}>{saveMsg}</span>
+        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {status === 'published' && savedId && (
+            <a href={`/${slug}`} target="_blank" className="text-xs text-[var(--teal)] hover:underline">ดูหน้า ↗</a>
+          )}
+          <button onClick={() => save(false)} disabled={saving} className="px-3 py-1.5 border border-[var(--line)] text-[var(--ink-3)] text-sm rounded-lg hover:bg-[var(--bg-2)] transition-colors disabled:opacity-50">
+            บันทึก Draft
+          </button>
+          <button onClick={() => save(true)} disabled={saving} className="px-4 py-1.5 bg-[var(--coral)] text-white text-sm font-semibold rounded-lg hover:bg-[var(--coral-deep)] transition-colors disabled:opacity-50">
+            {saving ? 'กำลังบันทึก...' : status === 'published' ? 'อัปเดต' : 'เผยแพร่'}
           </button>
         </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
         {/* Block Palette */}
-        <div className="w-56 bg-[var(--bg)] border-r border-[var(--line)] overflow-y-auto p-3">
+        <div className="w-52 bg-[var(--bg)] border-r border-[var(--line)] overflow-y-auto p-3 shrink-0">
           <p className="text-xs font-semibold text-[var(--ink-4)] uppercase tracking-wider mb-3 px-1">บล็อก</p>
           <div className="space-y-1">
             {BLOCK_TYPES.map((b) => (
@@ -156,7 +211,7 @@ export default function PageBuilderPage() {
                   className={`relative group bg-[var(--surface)] rounded-xl p-4 border-2 transition-all cursor-pointer ${selected === block.id ? 'border-[var(--coral)]' : 'border-transparent hover:border-[var(--line)]'}`}
                   onClick={() => setSelected(block.id)}
                 >
-                  <div className="absolute top-2 right-2 hidden group-hover:flex items-center gap-1">
+                  <div className="absolute top-2 right-2 hidden group-hover:flex items-center gap-1 z-10">
                     <button onClick={(e) => { e.stopPropagation(); moveBlock(block.id, -1); }} disabled={idx === 0} className="p-1 rounded hover:bg-[var(--bg-2)] disabled:opacity-30 text-xs">↑</button>
                     <button onClick={(e) => { e.stopPropagation(); moveBlock(block.id, 1); }} disabled={idx === blocks.length - 1} className="p-1 rounded hover:bg-[var(--bg-2)] disabled:opacity-30 text-xs">↓</button>
                     <button onClick={(e) => { e.stopPropagation(); removeBlock(block.id); }} className="p-1 rounded hover:bg-red-50 text-red-400 text-xs">×</button>
@@ -169,33 +224,109 @@ export default function PageBuilderPage() {
         </div>
 
         {/* Inspector */}
-        <div className="w-64 bg-[var(--surface)] border-l border-[var(--line)] overflow-y-auto p-4">
+        <div className="w-64 bg-[var(--surface)] border-l border-[var(--line)] overflow-y-auto p-4 shrink-0">
           {selectedBlock ? (
             <>
-              <p className="text-xs font-semibold text-[var(--ink-4)] uppercase tracking-wider mb-4">
-                {BLOCK_TYPES.find((b) => b.type === selectedBlock.type)?.label}
-              </p>
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-xs font-semibold text-[var(--ink-4)] uppercase tracking-wider">
+                  {BLOCK_TYPES.find((b) => b.type === selectedBlock.type)?.label}
+                </p>
+                <button onClick={() => setSelected(null)} className="text-xs text-[var(--ink-4)] hover:text-[var(--coral)]">✕</button>
+              </div>
               <div className="space-y-3">
-                {Object.entries(selectedBlock.data).map(([key, val]) => (
+                {Object.entries(selectedBlock.data).map(([key, val]) =>
                   typeof val === 'string' ? (
                     <div key={key}>
                       <label className="text-xs text-[var(--ink-4)] block mb-1 capitalize">{key}</label>
                       <textarea
                         value={val}
                         onChange={(e) => updateBlockData(selectedBlock.id, key, e.target.value)}
-                        rows={val.length > 100 ? 4 : 2}
+                        rows={val.length > 80 ? 4 : 2}
                         className="w-full text-sm border border-[var(--line)] rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--coral)] resize-none"
                       />
                     </div>
                   ) : null
-                ))}
+                )}
               </div>
             </>
           ) : (
-            <p className="text-sm text-[var(--ink-4)] text-center mt-8">เลือกบล็อกเพื่อแก้ไข</p>
+            /* Page Settings panel */
+            <div className="space-y-4">
+              <p className="text-xs font-semibold text-[var(--ink-4)] uppercase tracking-wider">ตั้งค่าหน้า</p>
+
+              <div>
+                <label className="text-xs text-[var(--ink-4)] block mb-1">ชื่อหน้า</label>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full text-sm border border-[var(--line)] rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--coral)]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-[var(--ink-4)] block mb-1">
+                  Slug (URL)
+                  {!slugManual && <span className="ml-1 text-[var(--teal)]">• auto</span>}
+                </label>
+                <div className="flex items-center gap-1 border border-[var(--line)] rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-[var(--coral)]">
+                  <span className="pl-2 text-xs text-[var(--ink-4)]">/</span>
+                  <input
+                    value={slug}
+                    onChange={(e) => { setSlug(e.target.value); setSlugManual(true); }}
+                    className="flex-1 text-sm px-1 py-2 outline-none font-mono bg-transparent"
+                    placeholder="my-page"
+                  />
+                  {slugManual && (
+                    <button
+                      onClick={() => { setSlugManual(false); setSlug(slugify(title)); }}
+                      className="px-2 text-xs text-[var(--ink-4)] hover:text-[var(--coral)]"
+                      title="Reset to auto"
+                    >↺</button>
+                  )}
+                </div>
+                <p className="text-xs text-[var(--ink-4)] mt-1">URL: <span className="font-mono">/{slug || '…'}</span></p>
+              </div>
+
+              <div>
+                <label className="text-xs text-[var(--ink-4)] block mb-1">สถานะ</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as typeof status)}
+                  className="w-full text-sm border border-[var(--line)] rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[var(--coral)]"
+                >
+                  <option value="draft">Draft — ซ่อนจากสาธารณะ</option>
+                  <option value="published">Published — เผยแพร่แล้ว</option>
+                  <option value="scheduled">Scheduled — กำหนดเวลา</option>
+                </select>
+              </div>
+
+              {savedId && status === 'published' && (
+                <a
+                  href={`/${slug}`}
+                  target="_blank"
+                  className="block text-center text-xs text-[var(--teal)] hover:underline py-2 border border-[var(--teal)] rounded-lg"
+                >
+                  ดูหน้าสาธารณะ ↗
+                </a>
+              )}
+
+              <p className="text-xs text-[var(--ink-4)] text-center pt-2">คลิกบล็อกเพื่อแก้ไขเนื้อหา</p>
+            </div>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PageBuilderPage() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-[var(--coral)] border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <PageBuilderInner />
+    </Suspense>
   );
 }

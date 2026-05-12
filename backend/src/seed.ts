@@ -14,12 +14,14 @@ const ProductSchema = new Schema({ name: String, price: Number, sku: String, sto
 const OrderSchema = new Schema({ items: [{ productId: Schema.Types.ObjectId, name: String, price: Number, qty: Number, image: String }], subtotal: Number, vat: Number, total: Number, status: String, channel: String, paymentMethod: String, receiptNumber: String, posTerminalId: String }, { timestamps: true });
 const PageSchema = new Schema({ title: String, slug: String, status: String, blocks: { type: [Schema.Types.Mixed], default: [] } }, { timestamps: true, strict: false });
 const UserSchema = new Schema({ email: String, password: String, name: String, role: String, isActive: { type: Boolean, default: true } }, { timestamps: true });
+const NavItemSchema = new Schema({ label: String, type: { type: String, default: 'url' }, url: String, pageId: Schema.Types.ObjectId, categoryId: Schema.Types.ObjectId, parentId: { type: Schema.Types.ObjectId, default: null }, order: { type: Number, default: 0 }, isVisible: { type: Boolean, default: true }, openInNewTab: { type: Boolean, default: false } }, { timestamps: true });
 
 const CategoryModel = model('Category', CategorySchema);
 const ProductModel = model('Product', ProductSchema);
 const OrderModel = model('Order', OrderSchema);
 const PageModel = model('Page', PageSchema);
 const UserModel = model('User', UserSchema);
+const NavItemModel = model('NavItem', NavItemSchema);
 
 const categories = [
   { name: 'อาหารและเครื่องดื่ม', icon: '🍜' },
@@ -145,6 +147,18 @@ async function seed() {
   await Promise.all(
     pages.map((p) => PageModel.findOneAndUpdate({ slug: p.slug }, p, { upsert: true })),
   );
+
+  // ── Nav items ──
+  const navItems = [
+    { label: 'หน้าแรก', type: 'url', url: '/', order: 0, isVisible: true },
+    { label: 'สินค้าทั้งหมด', type: 'url', url: '/#products', order: 1, isVisible: true },
+    { label: 'เกี่ยวกับเรา', type: 'page', url: '/about', order: 2, isVisible: true },
+    { label: 'ติดต่อเรา', type: 'page', url: '/contact', order: 3, isVisible: true },
+    { label: 'นโยบายคืนสินค้า', type: 'page', url: '/return-policy', order: 4, isVisible: true },
+  ];
+  for (const item of navItems) {
+    await NavItemModel.findOneAndUpdate({ label: item.label, parentId: null }, item, { upsert: true });
+  }
 
   console.log('Seed completed successfully');
   await redis.quit();

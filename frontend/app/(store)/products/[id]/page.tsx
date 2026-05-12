@@ -9,7 +9,10 @@ import { CartDrawer } from '@/components/store/CartDrawer';
 import type { Product } from '@/lib/api';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = (url: string) => fetch(url).then((r) => {
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+});
 
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -55,7 +58,7 @@ export default function ProductDetailPage() {
     );
   }
 
-  const images = product.images.length > 0 ? product.images : [''];
+  const images = (product.images ?? []).length > 0 ? product.images : [''];
   const outOfStock = product.stock === 0;
 
   return (
@@ -127,9 +130,9 @@ export default function ProductDetailPage() {
                 </div>
               )}
 
-              {product.tags.length > 0 && (
+              {(product.tags ?? []).length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-6">
-                  {product.tags.map((tag) => (
+                  {(product.tags ?? []).map((tag) => (
                     <span key={tag} className="px-2.5 py-1 bg-[var(--bg-2)] text-[var(--ink-3)] text-xs rounded-full border border-[var(--line)]">
                       {tag}
                     </span>

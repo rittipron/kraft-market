@@ -8,6 +8,11 @@ import { ProductsModule } from './products/products.module';
 import { OrdersModule } from './orders/orders.module';
 import { PosModule } from './pos/pos.module';
 import { PagesModule } from './pages/pages.module';
+import { NavModule } from './nav/nav.module';
+import { MediaModule } from './media/media.module';
+import { SettingsModule } from './settings/settings.module';
+import { StaffModule } from './staff/staff.module';
+import { CustomersModule } from './customers/customers.module';
 import { RedisModule } from './common/redis.module';
 import { HealthModule } from './health/health.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
@@ -35,6 +40,11 @@ import { RolesGuard } from './auth/roles.guard';
     OrdersModule,
     PosModule,
     PagesModule,
+    NavModule,
+    MediaModule,
+    SettingsModule,
+    StaffModule,
+    CustomersModule,
     HealthModule,
   ],
   providers: [

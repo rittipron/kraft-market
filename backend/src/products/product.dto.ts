@@ -26,7 +26,7 @@ export class CreateProductDto {
   @IsOptional() @IsArray() @IsString({ each: true })
   tags?: string[];
 
-  @IsOptional() @IsArray() @IsUrl({}, { each: true })
+  @IsOptional() @IsArray() @IsUrl({ require_tld: false }, { each: true })
   images?: string[];
 
   @IsOptional() @IsEnum(['active', 'draft', 'archived'])
@@ -49,7 +49,7 @@ export class UpdateProductDto {
   @IsOptional() @IsArray() @IsString({ each: true })
   tags?: string[];
 
-  @IsOptional() @IsArray() @IsUrl({}, { each: true })
+  @IsOptional() @IsArray() @IsUrl({ require_tld: false }, { each: true })
   images?: string[];
 
   @IsOptional() @IsEnum(['active', 'draft', 'archived'])

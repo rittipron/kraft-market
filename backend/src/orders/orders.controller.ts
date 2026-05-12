@@ -65,6 +65,12 @@ export class OrdersController {
   }
 
   @Roles('admin', 'staff')
+  @Get('customers')
+  getCustomers(@Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.ordersService.getCustomers(page ? parseInt(page) : 1, limit ? parseInt(limit) : 20);
+  }
+
+  @Roles('admin', 'staff')
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.ordersService.findOne(id);

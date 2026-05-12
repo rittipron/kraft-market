@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useEffect, useState, Suspense } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
+import { StoreHeader } from '@/components/store/StoreHeader';
 import type { PageBlock } from '@/lib/api';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
@@ -85,9 +86,11 @@ function BlockRenderer({ block }: { block: PageBlock }) {
   }
 }
 
-export default function CmsPage() {
+function CmsPageInner() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const slug = params?.slug as string;
+  const isPreview = searchParams.get('preview') === '1';
   const [page, setPage] = useState<CmsPage | null>(null);
   const [status, setStatus] = useState<'loading' | 'not-found' | 'ok'>('loading');
 
@@ -128,6 +131,16 @@ export default function CmsPage() {
 
   return (
     <div className="min-h-screen bg-[var(--bg)]">
+      {isPreview ? (
+        <div className="sticky top-0 z-50 bg-[var(--ink)] text-white px-4 py-2 flex items-center justify-between text-sm">
+          <span className="text-white/60">Preview Mode — <span className="text-[var(--coral)]">{page?.title}</span></span>
+          <a href="/admin/pages" className="flex items-center gap-1.5 px-3 py-1 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-xs font-medium">
+            ← กลับ Admin Pages
+          </a>
+        </div>
+      ) : (
+        <StoreHeader />
+      )}
       <div className="max-w-3xl mx-auto px-4 py-12">
         <h1 className="font-display text-3xl font-bold text-[var(--ink)] mb-8">{page?.title}</h1>
         {page?.blocks.map((block) => (
@@ -135,5 +148,13 @@ export default function CmsPage() {
         ))}
       </div>
     </div>
+  );
+}
+
+export default function CmsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-2 border-[var(--coral)] border-t-transparent rounded-full animate-spin" /></div>}>
+      <CmsPageInner />
+    </Suspense>
   );
 }

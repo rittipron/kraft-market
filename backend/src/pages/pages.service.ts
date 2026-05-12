@@ -20,9 +20,14 @@ export class PagesService {
   }
 
   async findOne(id: string): Promise<PageDocument> {
-    const page = await this.pageModel.findById(id).lean();
+    let page: PageDocument | null;
+    try {
+      page = await this.pageModel.findById(id).lean() as unknown as PageDocument | null;
+    } catch {
+      throw new NotFoundException('Page not found');
+    }
     if (!page) throw new NotFoundException('Page not found');
-    return page as unknown as PageDocument;
+    return page;
   }
 
   async create(data: any, authorId: string): Promise<PageDocument> {

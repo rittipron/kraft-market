@@ -4,10 +4,13 @@ import { PassportModule } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthController } from './auth.controller';
+import { OAuthController } from './oauth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guard';
+import { GoogleStrategy } from './strategies/google.strategy';
+import { FacebookStrategy } from './strategies/facebook.strategy';
 import { User, UserSchema } from './user.schema';
 
 @Module({
@@ -22,8 +25,8 @@ import { User, UserSchema } from './user.schema';
     }),
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
   ],
-  controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
+  controllers: [AuthController, OAuthController],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard, GoogleStrategy, FacebookStrategy],
   exports: [JwtAuthGuard, RolesGuard, AuthService],
 })
 export class AuthModule {}

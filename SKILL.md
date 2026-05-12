@@ -163,6 +163,112 @@ useEffect(() => {
 
 ---
 
+## 2b. Production Stack Error Patterns (NestJS + Next.js + Docker)
+
+### 🔴 `Cast to ObjectId failed for value "X"` (Mongoose)
+
+**สาเหตุ:** ส่ง string ที่ไม่ใช่ valid ObjectId (เช่น `"1"`) ไปที่ `findById()` → Mongoose throw CastError → NestJS ส่ง 500
+
+**วิธีแก้:** wrap ใน try/catch → throw NotFoundException
+```typescript
+async findOne(id: string) {
+  let doc: any;
+  try { doc = await this.model.findById(id).lean(); }
+  catch { throw new NotFoundException('Not found'); }
+  if (!doc) throw new NotFoundException('Not found');
+  return doc;
+}
+```
+
+---
+
+### 🔴 `@IsUrl()` ปฏิเสธ `http://localhost/...` (class-validator)
+
+**สาเหตุ:** `@IsUrl()` default ต้องการ TLD จริง — ปฏิเสธ `localhost`
+
+**วิธีแก้:**
+```typescript
+@IsOptional() @IsArray() @IsUrl({ require_tld: false }, { each: true })
+images?: string[];
+```
+
+---
+
+### 🔴 `useSearchParams()` ต้องการ Suspense wrapper (Next.js 14 App Router)
+
+**สาเหตุ:** Next.js 14 — `useSearchParams()` ใน Client Component ต้อง wrap ด้วย `<Suspense>` ไม่งั้น prerender crash
+
+**วิธีแก้:**
+```tsx
+function Inner() { const params = useSearchParams(); /* ... */ }
+export default function Page() {
+  return <Suspense><Inner /></Suspense>;
+}
+```
+
+---
+
+### 🔴 `npm ci` fail ใน Docker build หลังเพิ่ม dependency
+
+**สาเหตุ:** `package.json` เพิ่ม package แล้ว แต่ `package-lock.json` ยังไม่ update → integrity mismatch
+
+**วิธีแก้:** รันที่ local ก่อน rebuild
+```bash
+npm install --package-lock-only   # update lockfile เท่านั้น
+docker compose up -d --build backend
+```
+
+---
+
+### 🔴 TypeScript: `Namespace 'global.Express' has no exported member 'Multer'`
+
+**สาเหตุ:** ใช้ `Express.Multer.File` โดยไม่มี `@types/multer` ใน devDependencies
+
+**วิธีแก้:** เพิ่มใน `backend/package.json`:
+```json
+"@types/multer": "^1.4.11"
+```
+
+---
+
+### 🔴 Nginx proxy_pass → uploads 404 ทั้งที่ backend serve ได้ปกติ
+
+**สาเหตุ:** `useStaticAssets()` ใน NestJS serve ที่ port 3001 โดยตรง แต่ nginx proxy ไม่ส่ง path ถูกต้องในบาง config
+
+**วิธีแก้ที่ดีกว่า:** nginx serve จาก volume โดยตรง
+```nginx
+location /uploads/ {
+    alias /srv/uploads/;
+    try_files $uri =404;
+}
+```
+```yaml
+# docker-compose.dev.yml nginx service
+volumes:
+  - uploads_data:/srv/uploads:ro
+```
+
+---
+
+### 🔴 POS "ไม่พบสต็อกสินค้า" ทั้งที่ stock มีอยู่
+
+**สาเหตุ:** productId เป็น fake string (`'p1'`) แต่ Redis key คือ `stock:{MongoDB ObjectId}` → key ไม่ตรง → Lua script return nil
+
+**วิธีแก้:** fetch products จาก API จริง — ห้ามใช้ hardcode productId ใน POS เด็ดขาด
+
+---
+
+### 🟡 `Cannot find module '../auth/decorators'` (NestJS)
+
+**สาเหตุ:** `@Public`, `@Roles` decorators อยู่ที่ `src/common/decorators.ts`
+
+**วิธีแก้:**
+```typescript
+import { Public, Roles } from '../common/decorators'; // ✅
+```
+
+---
+
 ## 3. Next.js Specific Skills
 
 ### App Router Error Patterns
@@ -565,6 +671,176 @@ const script = `
 `;
 const success = await this.redis.eval(script, 1, `stock:${productId}`, qty);
 if (!success) throw new ConflictException('สินค้าหมด');
+```
+
+---
+
+## 9b. OAuth + Social Login Patterns
+
+### NestJS Passport OAuth Strategy (Google / LINE / Facebook)
+
+```typescript
+// ติดตั้ง: npm i passport-google-oauth20 @types/passport-google-oauth20
+// ติดตั้ง: npm i passport-line-auth passport-facebook @types/passport-facebook
+
+// backend/src/auth/strategies/google.strategy.ts
+@Injectable()
+export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
+  constructor(config: ConfigService, private authService: AuthService) {
+    super({
+      clientID: config.get('GOOGLE_CLIENT_ID'),
+      clientSecret: config.get('GOOGLE_CLIENT_SECRET'),
+      callbackURL: config.get('OAUTH_CALLBACK_BASE') + '/auth/google/callback',
+      scope: ['email', 'profile'],
+    });
+  }
+  async validate(accessToken: string, refreshToken: string, profile: any) {
+    return this.authService.findOrCreateOAuthUser({
+      provider: 'google',
+      providerId: profile.id,
+      email: profile.emails[0].value,
+      name: profile.displayName,
+      avatar: profile.photos?.[0]?.value,
+    });
+  }
+}
+
+// backend/src/auth/auth.controller.ts — OAuth routes
+@Public()
+@Get('google')
+@UseGuards(AuthGuard('google'))
+googleLogin() {}  // redirects to Google
+
+@Public()
+@Get('google/callback')
+@UseGuards(AuthGuard('google'))
+googleCallback(@Req() req: any, @Res() res: Response) {
+  const { accessToken } = req.user;
+  // redirect ไปหน้า frontend พร้อม token
+  res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${accessToken}`);
+}
+```
+
+**env vars ที่ต้องเพิ่มใน .env:**
+```
+GOOGLE_CLIENT_ID=xxx
+GOOGLE_CLIENT_SECRET=xxx
+LINE_CHANNEL_ID=xxx
+LINE_CHANNEL_SECRET=xxx
+FACEBOOK_APP_ID=xxx
+FACEBOOK_APP_SECRET=xxx
+OAUTH_CALLBACK_BASE=http://localhost
+FRONTEND_URL=http://localhost
+```
+
+**ขั้นตอน register app:**
+- Google: console.cloud.google.com → Credentials → OAuth 2.0 Client ID → Web app
+  → Authorized redirect: `http://localhost/api/auth/google/callback`
+- LINE: developers.line.biz → Create Provider → Create Channel (LOGIN)
+  → Callback URL: `http://localhost/api/auth/line/callback`
+- Facebook: developers.facebook.com → Create App → Facebook Login
+  → Valid OAuth Redirect URI: `http://localhost/api/auth/facebook/callback`
+
+---
+
+### OAuth Popup Flow Pattern (Frontend)
+
+```typescript
+// เปิด popup OAuth แล้วรับ token กลับผ่าน postMessage
+function openOAuthPopup(provider: 'google' | 'line' | 'facebook') {
+  const url = `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '')}/api/auth/${provider}`;
+  const popup = window.open(url, 'oauth', 'width=500,height=600,left=200,top=100');
+
+  const handler = (event: MessageEvent) => {
+    if (event.data?.type !== 'oauth_token') return;
+    window.removeEventListener('message', handler);
+    popup?.close();
+    // event.data.token คือ JWT ที่ backend ส่งมา
+    handleTokenReceived(event.data.token);
+  };
+  window.addEventListener('message', handler);
+}
+
+// หน้า frontend /auth/callback/page.tsx — รับ token จาก URL แล้ว postMessage กลับ
+useEffect(() => {
+  const token = new URLSearchParams(window.location.search).get('token');
+  if (token && window.opener) {
+    window.opener.postMessage({ type: 'oauth_token', token }, window.location.origin);
+    window.close();
+  }
+}, []);
+```
+
+**หมายเหตุ:** ถ้า backend ยังไม่ได้ set credentials จริง → route `/api/auth/google` จะ redirect loop หรือ error — ต้อง set env vars ก่อนใช้งาน
+
+---
+
+### Canvas Resize Pattern (Client-side, before upload)
+
+```typescript
+// ลด size รูปให้ไม่เกิน maxBytes โดยใช้ canvas
+async function resizeImageFile(file: File, maxBytes = 1_000_000): Promise<File> {
+  if (file.size <= maxBytes) return file; // ไม่ต้อง resize
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      // คำนวณ scale จาก ratio ของ maxBytes/fileSize
+      const scale = Math.sqrt(maxBytes / file.size);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      canvas.toBlob(
+        (blob) => {
+          resolve(new File([blob!], file.name, { type: 'image/jpeg' }));
+        },
+        'image/jpeg',
+        0.85, // quality
+      );
+    };
+    img.src = url;
+  });
+}
+```
+
+**วิธีใช้ใน ImageManager:**
+```typescript
+const uploadAndAdd = async (rawFile: File) => {
+  const file = await resizeImageFile(rawFile, 1_000_000); // max 1MB
+  // ... ส่ง file ไป backend ตามปกติ
+};
+```
+
+**ข้อจำกัด:** รูป PNG แบบ transparency จะถูกแปลงเป็น JPEG (ไม่มี alpha) — ถ้าต้องการรักษา PNG ให้ check `file.type === 'image/png'` และ export เป็น PNG แทน
+
+---
+
+### Customer-facing Route Guards Pattern
+
+```typescript
+// Guard สำหรับ customer routes — ต้อง role='customer'
+// ใช้ decorator เดิม @Roles('customer') + existing RolesGuard
+
+// ใน controller:
+@Roles('customer')
+@Get('me')
+getProfile(@Req() req: any) { return req.user; }
+
+// ใน frontend: เก็บ customer token ใน localStorage key ต่างจาก admin
+// admin:    localStorage.getItem('kraft_token')
+// customer: localStorage.getItem('kraft_customer_token')
+// ทั้งคู่ใช้ JWT เดียวกัน แต่ role ต่างกัน — frontend อ่าน role จาก JWT payload
+
+// แยก auth store:
+// useAuthStore()         → admin session
+// useCustomerAuthStore() → customer session
+
+// ป้องกัน admin route จาก customer login:
+// middleware.ts เช็ค role ก่อน redirect
 ```
 
 ---

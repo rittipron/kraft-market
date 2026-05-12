@@ -49,6 +49,9 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES: 7d
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      UPLOADS_DIR: /app/uploads
+    volumes:
+      - uploads_data:/app/uploads
     expose:
       - "3001"
     depends_on:
@@ -108,3 +111,4 @@ networks:
 volumes:
   mongo_data:
   redis_data:
+  uploads_data:
